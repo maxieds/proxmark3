@@ -815,10 +815,17 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
         recv = resp.data.asBytes;
         int iLen = resp.oldarg[0];
 
-        if (!iLen) {
+        fprintf(stderr, "   --- This documents BUG #1:\n");
+        fprintf(stderr, "   --- Value of iLen = resp.oldarg[0]                : 0x%02x\n", iLen);
+        fprintf(stderr, "   --- Value of !iLen that evaluates to Boolean TRUE : 0x%02x -> %s\n", !iLen, !iLen ? "true" : "false");
+        fprintf(stderr, "   --- Apparent value of the resp.oldarg buffer      : %s\n", sprint_hex((const uint8_t *)resp.oldarg, 3));
+        fprintf(stderr, "   --- Observe that the printed contents of the buffer show that the next (NOW COMMENTED OUT)\n");
+        fprintf(stderr, "       check should not get triggered. We are going to skip the failure that happens and move along.\n");
+        fprintf(stderr, "\n"); 
+        /*if (!iLen) {
             if (!silentMode) PrintAndLogEx(ERR, "No card response.");
             return 1;
-        }
+        }*/
 
         *dataoutlen = iLen - 2;
         if (*dataoutlen < 0)
@@ -829,7 +836,24 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
             return 2;
         }
 
-        if (recv[0] != data[0]) {
+        fprintf(stderr, "   --- This documents BUG #2:\n");
+        fprintf(stderr, "   --- Byte value of recv[0], data[0], their difference (subtraction), and dataout[0]:\n");
+        fprintf(stderr, "       0x%02x | 0x%02x | 0x%08x | 0x%02x\n", recv[0], data[0], recv[0] - data[0], dataout[0]);
+        fprintf(stderr, "   --- But wait a minute, I swore my Chameleon dev code was framing things correctly?\n");
+        fprintf(stderr, "       I triple checked it! So let's see what is in these buffers to see if I'm losing my bits...\n");
+        fprintf(stderr, "   --- Apparent value of recv buffer by inspection:\n       %s\n", sprint_hex(recv, PM3_CMD_DATA_SIZE));
+        fprintf(stderr, "   --- Apparent value of data buffer by inspection:\n       %s\n", sprint_hex(data, PM3_CMD_DATA_SIZE));
+        fprintf(stderr, "   --- Apparent value of dataout buffer by inspection:\n       %s\n", sprint_hex(dataout, PM3_CMD_DATA_SIZE));
+        fprintf(stderr, "   --- Inspection suggests that the check (recv[0] != data[0]) should not get triggered. BUT IT DOES?!?\n");
+        fprintf(stderr, "   --- Let's play devil's advocate for a moment, and optionally skip over this unexpected failure\n");
+        fprintf(stderr, "       by setting the (bash) environment variable `SKIP_MFDES_BUGS=1` to see what happens.\n");
+        fprintf(stderr, "       If this variable is not set, or it evaluates to zero (0), then we fail as in the current\n");
+        fprintf(stderr, "       production version of the `pm3`` client code.\n");
+        char *skipMfDesBugsEnvVarSetting = getenv("SKIP_MFDES_BUGS");
+        bool skipBugNumberTwo = (skipMfDesBugsEnvVarSetting != NULL) && atoi(skipMfDesBugsEnvVarSetting) != 0;
+        fprintf(stderr, "   --- %s SKIPPING the check triggered by Bug #2\n", skipBugNumberTwo ? "+++" : "NOT");
+        fprintf(stderr, "\n");
+        if (recv[0] != data[0] && !skipBugNumberTwo) {
             if (!silentMode) PrintAndLogEx(ERR, "iso14443-4 framing error. Card send %2x must be %2x", dataout[0], data[0]);
             return 2;
         }
